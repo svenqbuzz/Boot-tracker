@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Boot Tracker Holwerd - Live Dashboard voor Buschauffeurs</title>
+    <title>Boot Tracker Holwerd</title>
     
-    <!-- Leaflet CSS voor de landkaart -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
@@ -34,12 +33,6 @@
 
         header h1 {
             font-size: 1.5rem;
-            margin-bottom: 5px;
-        }
-
-        header p {
-            font-size: 0.9rem;
-            opacity: 0.9;
         }
 
         .container {
@@ -78,11 +71,13 @@
             background: #f0f4f8;
             padding: 12px;
             border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .filter-section h3 {
             font-size: 1rem;
-            margin-bottom: 8px;
         }
 
         .checkbox-group {
@@ -96,6 +91,23 @@
             gap: 6px;
             font-weight: 600;
             cursor: pointer;
+        }
+
+        .radar-button {
+            display: block;
+            text-align: center;
+            background: #22c55e;
+            color: white;
+            text-decoration: none;
+            padding: 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        .radar-button:hover {
+            background: #16a34a;
         }
 
         /* Boten Lijst Cards */
@@ -177,7 +189,7 @@
         #map {
             flex: 2;
             width: 100%;
-            height: 400px; /* Mobiel standaard */
+            height: 400px;
         }
 
         @media (min-width: 768px) {
@@ -186,7 +198,6 @@
             }
         }
 
-        /* Custom marker styling */
         .harbor-label {
             background: #0b69a3;
             color: white;
@@ -203,11 +214,9 @@
 
     <header>
         <h1>Veerhaven Holwerd - Live Aankomsten</h1>
-        <p>Speciaal dashboard voor buschauffeurs. Toont alleen boten richting Holwerd.</p>
     </header>
 
     <div class="container">
-        <!-- Zijkant met filters en live lijst -->
         <div class="sidebar">
             <div class="filter-section">
                 <h3>Diensten filteren:</h3>
@@ -219,46 +228,43 @@
                         <input type="checkbox" id="filter-snel" checked onchange="updateDashboard()"> Sneldienst
                     </label>
                 </div>
+                <a href="https://www.vesselfinder.com/?vessel=244630384" target="_blank" class="radar-button">🌐 Open Live Scheepsradar</a>
             </div>
 
             <div class="boat-list" id="boat-container">
-                <!-- Boten worden hier via JavaScript ingeladen -->
-            </div>
+                </div>
         </div>
 
-        <!-- De Kaart -->
         <div id="map"></div>
     </div>
 
-    <!-- Leaflet JavaScript voor de landkaart -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Coördinaten van de veerhaven Holwerd
         const holwerdCoords = [53.3831, 5.8776];
+        let userMarker = null;
 
-        // Live testdata van boten (richting Holwerd)
-        // In een latere stap kan dit aan een echte live-feed gekoppeld worden
+        // Actuele testdata
         let boatsData = [
             {
                 id: 1,
                 name: "Oerd",
                 type: "veerdienst",
-                status: "ontime", // ontime, delayed, cancelled
-                eta: "13:15",
-                minutesLeft: 22,
-                passengersEst: "~320 personen",
-                coords: [53.4210, 5.8120] // Halverwege Ameland - Holwerd
+                status: "ontime",
+                eta: "14:15",
+                minutesLeft: 18,
+                passengersEst: "~210 personen",
+                coords: [53.4010, 5.8320] 
             },
             {
                 id: 2,
                 name: "Fostertand",
                 type: "sneldienst",
                 status: "delayed",
-                eta: "13:30 (5 min vertraging)",
-                minutesLeft: 37,
-                passengersEst: "~45 personen",
-                coords: [53.4450, 5.7810] // Vertrekt net bij Ameland
+                eta: "14:35 (5 min vertraging)",
+                minutesLeft: 38,
+                passengersEst: "~35 personen",
+                coords: [53.4390, 5.7910] 
             },
             {
                 id: 3,
@@ -268,40 +274,36 @@
                 eta: "--:--",
                 minutesLeft: null,
                 passengersEst: "Geen (Afgetrapt)",
-                coords: [53.4490, 5.7720] // Ligt nog stil in de haven van Ameland
+                coords: [53.4490, 5.7720] 
             }
         ];
 
-        // Kaart initialiseren
-        const map = L.map('map').setView([53.4150, 5.8250], 12); // Gefocust op de Waddenzee tussen Ameland en Holwerd
+        // Kaart opstarten
+        const map = L.map('map').setView([53.4150, 5.8250], 12);
 
-        // Gratis kaartondergrond laden via OpenStreetMap
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // Veerhaven Holwerd markeren op de kaart
+        // Haven markeren
         const harborMarker = L.marker(holwerdCoords).addTo(map);
-        harborMarker.bindTooltip("<b>VEERHAVEN HOLWERD</b><br>Bus-aansluiting", { permanent: true, direction: 'bottom', className: 'harbor-label' });
+        harborMarker.bindTooltip("<b>VEERHAVEN HOLWERD</b>", { permanent: true, direction: 'bottom', className: 'harbor-label' });
 
-        // Groep voor de boot-iconen op de kaart
         let markerGroup = L.layerGroup().addTo(map);
 
-        // Dashboard updaten (Lijst + Kaart)
+        // Dashboard updaten
         function updateDashboard() {
             const showVeer = document.getElementById('filter-veer').checked;
             const showSnel = document.getElementById('filter-snel').checked;
             
             const listContainer = document.getElementById('boat-container');
-            listContainer.innerHTML = ''; // Maak lijst leeg
-            markerGroup.clearLayers();    // Maak kaart markers leeg
+            listContainer.innerHTML = ''; 
+            markerGroup.clearLayers();    
 
             boatsData.forEach(boat => {
-                // Check of de boot gefilterd moet worden
                 if (boat.type === 'veerdienst' && !showVeer) return;
                 if (boat.type === 'sneldienst' && !showSnel) return;
 
-                // 1. Maak de Card voor de linkerkolom
                 const card = document.createElement('div');
                 card.className = `boat-card status-${boat.status}`;
                 card.id = `card-${boat.id}`;
@@ -309,9 +311,9 @@
 
                 let statusText = `<div class="boat-info">Aankomst: <span class="eta-highlight">${boat.eta}</span></div>`;
                 if (boat.status === 'ontime') {
-                    statusText += `<div class="boat-info" style="color:#22c55e; font-weight:bold;">Komt eraan over ca. ${boat.minutesLeft} min.</div>`;
+                    statusText += `<div class="boat-info" style="color:#22c55e; font-weight:bold;">Onderweg: over ca. ${Math.ceil(boat.minutesLeft)} min.</div>`;
                 } else if (boat.status === 'delayed') {
-                    statusText += `<div class="boat-info" style="color:#f59e0b; font-weight:bold;">Vertraagd: nog ${boat.minutesLeft} min.</div>`;
+                    statusText += `<div class="boat-info" style="color:#f59e0b; font-weight:bold;">Vertraagd: nog ${Math.ceil(boat.minutesLeft)} min.</div>`;
                 } else if (boat.status === 'cancelled') {
                     statusText = `<div class="cancelled-banner">✖ GEANNULEERD (Vaart niet)</div>`;
                 }
@@ -328,10 +330,8 @@
                 `;
                 listContainer.appendChild(card);
 
-                // 2. Plaats de boot op de landkaart (als deze niet geannuleerd is, of toon hem in de haven)
                 let markerColor = boat.status === 'cancelled' ? 'red' : (boat.type === 'sneldienst' ? 'orange' : 'blue');
                 
-                // Simpele cirkel-marker voor de boot
                 const boatMarker = L.circleMarker(boat.coords, {
                     radius: 10,
                     fillColor: markerColor,
@@ -340,40 +340,31 @@
                     fillOpacity: 0.9
                 });
 
-                // Klikken op de kaart-marker activeert de card aan de zijkant
                 boatMarker.on('click', () => {
                     focusBoat(boat.id, boat.coords);
                 });
 
-                // Tekstballonnetje bij de boot op de kaart
                 const popupContent = `
                     <b style="font-size:1.1rem;">m.s. ${boat.name}</b><br>
                     <b>Type:</b> ${boat.type.toUpperCase()}<br>
-                    <b>Status:</b> ${boat.status === 'cancelled' ? 'GEANNULEERD' : 'Onderweg naar Holwerd'}<br>
-                    <b>Verwachte aankomst:</b> ${boat.eta}
+                    <b>Status:</b> ${boat.status === 'cancelled' ? 'GEANNULEERD' : 'Richting Holwerd'}<br>
+                    <b>Aankomst:</b> ${boat.eta}
                 `;
                 boatMarker.bindPopup(popupContent);
                 
-                // Voeg toe aan de kaart-groep
                 markerGroup.addLayer(boatMarker);
-                boatMarker.boatId = boat.id; // ID opslaan op de marker om later te zoeken
+                boatMarker.boatId = boat.id; 
             });
         }
 
-        // Als je op een boot klikt, centreert de kaart en licht de lijst op
         function focusBoat(id, coords) {
-            // Kaart verplaatsen naar de boot
             map.panTo(coords);
-
-            // Alle cards de-activeren en de juiste activeren
             document.querySelectorAll('.boat-card').forEach(card => card.classList.remove('active'));
             const selectedCard = document.getElementById(`card-${id}`);
             if (selectedCard) {
                 selectedCard.classList.add('active');
                 selectedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
-
-            // Open de pop-up op de kaart die bij deze boot hoort
             markerGroup.eachLayer(layer => {
                 if (layer.boatId === id) {
                     layer.openPopup();
@@ -381,23 +372,55 @@
             });
         }
 
-        // Een kleine simulator om de minuten live te laten aftellen op het scherm!
+        // Live GPS Chauffeur
+        function trackUserLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(
+                    (position) => {
+                        const lat = position.coords.coords ? position.coords.coords.latitude : position.coords.latitude;
+                        const lng = position.coords.coords ? position.coords.coords.longitude : position.coords.longitude;
+                        const userCoords = [lat, lng];
+
+                        if (userMarker) {
+                            userMarker.setLatLng(userCoords);
+                        } else {
+                            userMarker = L.circleMarker(userCoords, {
+                                radius: 8,
+                                fillColor: '#3b82f6',
+                                color: '#ffffff',
+                                weight: 3,
+                                fillOpacity: 1
+                            }).addTo(map);
+                            userMarker.bindTooltip("Jouw Locatie (Bus)", { direction: 'top' });
+                        }
+                    },
+                    (error) => {
+                        console.log("GPS toegang niet beschikbaar.");
+                    },
+                    { enableHighAccuracy: true }
+                );
+            }
+        }
+
+        // AUTOMATISCHE VERVERSING ELKE 5 SECONDEN
         setInterval(() => {
             boatsData.forEach(boat => {
-                if (boat.minutesLeft && boat.minutesLeft > 1) {
-                    boat.minutesLeft -= 1;
-                    // Pas de ETA tekst subtiel aan om te laten zien dat het leeft
-                    if (boat.status === 'ontime') {
-                        boat.eta = new Date(Date.now() + boat.minutesLeft * 60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    }
+                if (boat.minutesLeft && boat.minutesLeft > 0.1) {
+                    // Haal 5 seconden van de tijd af (5 seconden = 5 / 60 van een minuut)
+                    boat.minutesLeft -= (5 / 60); 
+                    
+                    // Laat de boot vloeiend bewegen richting de haven
+                    const latDiff = (holwerdCoords[0] - boat.coords[0]) * 0.003;
+                    const lngDiff = (holwerdCoords[1] - boat.coords[1]) * 0.003;
+                    boat.coords = [boat.coords[0] + latDiff, boat.coords[1] + lngDiff];
                 }
             });
-            // Update alleen de teksten op het scherm zonder de kaart te resetten
             updateDashboard();
-        }, 60000); // Elke minuut updaten
+        }, 5000); // 5000ms = 5 seconden
 
-        // Eerste keer opstarten van het dashboard
+        // Opstarten
         updateDashboard();
+        trackUserLocation();
     </script>
 </body>
 </html>
